@@ -1,4 +1,4 @@
-# imagegen
+# OllamaImageGen
 
 A small web UI for generating images with Ollama's image models, **x/z-image-turbo** and **x/flux2-klein**.
 
@@ -19,12 +19,60 @@ It's a single Python file with no dependencies beyond the standard library. The 
 ## Requirements
 
 - Python 3.8 or newer. No `pip install` needed.
-- An Ollama server with the image models pulled:
-  ```bash
-  ollama pull x/z-image-turbo
-  ollama pull x/flux2-klein
-  ```
+- Ollama **0.32.0 to 0.32.5**, running on **macOS**. See [Setting up Ollama](#setting-up-ollama).
 - Optional: [tunnelmole](https://tunnelmole.com) (`tmole`) or any other tunnel, for access from outside your network.
+
+The web server itself can run on any machine that can reach the Mac running Ollama.
+
+## Setting up Ollama
+
+Ollama must run on **macOS**, at a version from **0.32.0 to 0.32.5**. Other versions aren't supported.
+
+### 1. Install a supported version
+
+Install with the official script, setting `OLLAMA_VERSION` to a version in the supported range:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | OLLAMA_VERSION=0.32.5 sh
+```
+
+Any of `0.32.0`, `0.32.1`, `0.32.2`, `0.32.3`, `0.32.4` or `0.32.5` works. Note that `OLLAMA_VERSION` goes after the `|`, on the `sh` side.
+
+Check the installed version:
+
+```bash
+ollama --version
+```
+
+### 2. Turn off automatic updates
+
+The Ollama app updates itself by default, which would move it out of the supported range.
+
+1. Open the Ollama app and go to **Settings**.
+2. Turn **Auto-download updates** off.
+
+If Ollama does update, run the install command from step 1 again to go back to a supported version. Downloaded models are kept.
+
+### 3. Pull the image models
+
+```bash
+ollama pull x/z-image-turbo
+ollama pull x/flux2-klein
+```
+
+### 4. Allow access from other machines
+
+If the web server runs on a different machine from Ollama, Ollama has to listen on the network, not only on localhost:
+
+```bash
+launchctl setenv OLLAMA_HOST "0.0.0.0"
+```
+
+Then quit and reopen the Ollama app. You can confirm access from the machine running the web server:
+
+```bash
+curl http://<ollama-host>:11434/api/version
+```
 
 ## Quick start
 
@@ -231,7 +279,10 @@ lsof -nP -iTCP:8080 -sTCP:LISTEN
   ```
 
 **The status dot is red**
-Check the address in the **Ollama server** field. Make sure Ollama listens on the network and not only on localhost (`OLLAMA_HOST=0.0.0.0`), and that no firewall is blocking port 11434.
+Check the address in the **Ollama server** field. Make sure Ollama listens on the network and not only on localhost (see [step 4 of Setting up Ollama](#4-allow-access-from-other-machines)), and that no firewall is blocking port 11434.
+
+**Generation stopped working after Ollama updated**
+Run `ollama --version` on the Mac. If it's outside 0.32.0 to 0.32.5, reinstall a supported version and turn off **Auto-download updates** (see [Setting up Ollama](#setting-up-ollama)).
 
 **Long generations fail when Ollama is reached through a tunnel**
 The page itself isn't affected, because it only sends short requests to check on jobs. The request from the server to Ollama, though, stays open for the whole generation, and some tunnels close long requests. Point the server at Ollama over the LAN instead of through a tunnel.
