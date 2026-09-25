@@ -20,7 +20,7 @@ It's a single Python file with no dependencies beyond the standard library. The 
 
 - Python 3.8 or newer. No `pip install` needed.
 - Ollama **0.32.0 to 0.32.5**, running on **macOS**. See [Setting up Ollama](#setting-up-ollama).
-- Optional: [tunnelmole](https://tunnelmole.com) (`tmole`) or any other tunnel, for access from outside your network.
+- Optional: a tunnel or reverse proxy, for access from outside your network.
 
 The web server itself can run on any machine that can reach the Mac running Ollama.
 
@@ -115,18 +115,10 @@ The login is set in the terminal, not through a setup page, on purpose. When the
 
 ## Accessing it remotely
 
-Start the server, then tunnel its port:
-
-```bash
-python3 ollama-img-web.py -o http://<ollama-host>:11434
-tmole 8080
-```
-
-Open the `https://….tunnelmole.net` URL that `tmole` prints, from any device.
+Run the server, then expose port 8080 with a tunnel or reverse proxy that serves it over HTTPS. Open the URL it gives you from any device.
 
 - **You only need one tunnel.** Point the server at Ollama over your LAN (`http://<ollama-host>:11434`) and tunnel only the web page. Exposing Ollama through its own tunnel makes its whole API public with no authentication.
 - **On the machine running the server, use `http://localhost:8080`.** Going through the tunnel sends every image out to the internet and back.
-- **Free tunnelmole URLs change each time `tmole` restarts.**
 
 ## Options
 
@@ -264,7 +256,7 @@ curl -u mike:PASSWORD http://localhost:8080/api/generate \
 ## Troubleshooting
 
 **`OSError: [Errno 48] Address already in use`** (on Linux, `Errno 98`)
-Another program is using the port. Pick another port with `-p 8081` and tunnel that port instead (`tmole 8081`), or find what's using it:
+Another program is using the port. Pick another port with `-p 8081` (and point your tunnel at that port instead), or find what's using it:
 ```bash
 lsof -nP -iTCP:8080 -sTCP:LISTEN
 ```
@@ -302,5 +294,5 @@ git config core.fileMode false
 ## Security notes
 
 - Always use the login when the server is reachable from outside your network. Anyone with the URL can otherwise use your GPU.
-- Basic Auth sends the login with every request. That's safe over HTTPS, which tunnelmole provides. On plain `http://`, use it only on your own network.
+- Basic Auth sends the login with every request. That's safe over HTTPS. On plain `http://`, use it only on your own network.
 - The **Ollama server** field lets anyone who is signed in point the server at another address. The server only calls Ollama API paths on that address.
