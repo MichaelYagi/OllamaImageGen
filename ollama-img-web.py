@@ -270,6 +270,9 @@ PAGE = r"""<!doctype html>
   form { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
          padding: 16px; display: flex; flex-direction: column; gap: 14px; align-self: start; }
   label { font-size: .875rem; color: var(--muted); }
+  #past { width: 100%; margin-bottom: 8px; padding: 8px 10px; font: inherit; font-size: .9rem;
+          color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+  #past:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   textarea { width: 100%; min-height: 150px; resize: vertical; padding: 10px;
              font: inherit; color: var(--ink); background: var(--bg);
              border: 1px solid var(--line); border-radius: 6px; }
@@ -343,6 +346,9 @@ PAGE = r"""<!doctype html>
     <h1>Generate an image</h1>
     <div>
       <label for="prompt">Prompt</label>
+      <select id="past" aria-label="Past prompts" hidden>
+        <option value="">Past prompts…</option>
+      </select>
       <textarea id="prompt" required placeholder="A red fox asleep in fresh snow, morning light"></textarea>
     </div>
     <fieldset aria-label="Model">
@@ -551,9 +557,42 @@ $('#selDel').onclick = async () => {
   await refresh();
 };
 
+// ---- past prompts: newest first, one entry per distinct prompt
+let pastKey = '', pastList = [];
+function renderPast() {
+  const seen = new Set();
+  pastList = [];
+  for (const j of jobs) {                      // jobs are already newest first
+    if (seen.has(j.prompt)) continue;
+    seen.add(j.prompt);
+    pastList.push({prompt: j.prompt, model: j.model});
+    if (pastList.length >= 50) break;
+  }
+  const key = pastList.map(p => p.model + '\u0000' + p.prompt).join('\u0001');
+  if (key === pastKey) return;
+  pastKey = key;
+  const sel = $('#past');
+  sel.replaceChildren(new Option('Past prompts…', ''));
+  pastList.forEach((p, i) => {
+    const short = p.prompt.length > 70 ? p.prompt.slice(0, 70) + '…' : p.prompt;
+    const tag = p.model === 'x/flux2-klein' ? 'Klein' : 'Turbo';
+    sel.append(new Option(`${short}  (${tag})`, String(i)));
+  });
+  sel.hidden = pastList.length === 0;
+}
+$('#past').addEventListener('change', e => {
+  const p = pastList[+e.target.value];
+  e.target.value = '';                         // back to the placeholder so the same prompt can be picked again
+  if (!p) return;
+  $('#prompt').value = p.prompt;
+  const radio = document.querySelector(`input[name=model][value="${p.model}"]`);
+  if (radio) radio.checked = true;
+  $('#prompt').focus();
+});
+
 function render() {
   if (!jobs.some(j => j.id === selected)) selected = cleared ? null : (jobs[0]?.id ?? null);
-  renderStage(); renderBulk(); renderStrip();
+  renderStage(); renderBulk(); renderStrip(); renderPast();
 }
 
 async function refresh() {
