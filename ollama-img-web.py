@@ -35,6 +35,7 @@ import os
 import queue
 import re
 import secrets
+import signal
 import sys
 import threading
 import time
@@ -789,4 +790,22 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Ollama: NOT reachable at {OLLAMA_URL} ({getattr(e, 'reason', e)}). "
               "Starting anyway; you can set a different URL in the page.")
-    ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
+    server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
+    server.daemon_threads = True             # don't wait on open connections at exit
+
+    def _stop(signum, frame):
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, _stop)     # systemd/kill get the same clean exit as Ctrl+C
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        print("\nShutting down…")
+        server.server_close()
+        with jobs_lock:
+            unfinished = sum(1 for j in jobs.values() if j["status"] in ("queued", "running"))
+        if unfinished:
+            print(f"{unfinished} unfinished job{'s' if unfinished != 1 else ''} discarded.")
+        print("Stopped.")
