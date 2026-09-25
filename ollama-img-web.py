@@ -391,6 +391,7 @@ const $ = s => document.querySelector(s);
 const KEY = 'ollama-img-web:url';
 const ollamaInput = $('#ollama');
 let jobs = [], selected = null, shownKey = '', pollTimer;
+let cleared = false;   // true when the user deselected the viewed image on purpose
 
 try { ollamaInput.value = localStorage.getItem(KEY) || ''; } catch {}
 fetch('health').then(r => r.json()).then(d => { ollamaInput.placeholder = d.ollama; }).catch(() => {});
@@ -505,7 +506,8 @@ function renderStrip() {
     else b.textContent = j.status === 'error' ? 'Failed' : j.status === 'running' ? 'Working' : 'Queued';
     b.onclick = () => {
       if (selecting) { picked.has(j.id) ? picked.delete(j.id) : picked.add(j.id); }
-      else selected = j.id;
+      else if (selected === j.id) { selected = null; cleared = true; }
+      else { selected = j.id; cleared = false; }
       render();
     };
     return b;
@@ -550,7 +552,7 @@ $('#selDel').onclick = async () => {
 };
 
 function render() {
-  if (!jobs.some(j => j.id === selected)) selected = jobs[0]?.id ?? null;
+  if (!jobs.some(j => j.id === selected)) selected = cleared ? null : (jobs[0]?.id ?? null);
   renderStage(); renderBulk(); renderStrip();
 }
 
@@ -585,7 +587,7 @@ $('#f').addEventListener('submit', async e => {
     });
     const d = await r.json().catch(() => ({error: `Server returned ${r.status}.`}));
     if (!r.ok) throw new Error(d.error);
-    selected = d.id;
+    selected = d.id; cleared = false;
     await refresh();
   } catch (err) {
     selected = null; shownKey = '';
