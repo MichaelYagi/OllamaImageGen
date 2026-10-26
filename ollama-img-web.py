@@ -407,6 +407,13 @@ PAGE = r"""<!doctype html>
   </form>
 </dialog>
 <script>
+// If the page was opened as http://user:pass@host/, browsers refuse fetch() on relative URLs
+// (they'd inherit the credentials). Resolve against the credential-free origin instead.
+{
+  const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+  const _fetch = window.fetch.bind(window);
+  window.fetch = (u, o) => _fetch(typeof u === 'string' ? new URL(u, base).href : u, o);
+}
 const $ = s => document.querySelector(s);
 const KEY = 'ollama-img-web:url';
 const ollamaInput = $('#ollama');
@@ -813,7 +820,7 @@ class Handler(BaseHTTPRequestHandler):
         self._json(200, {"deleted": m.group(1)})
 
     def log_message(self, fmt, *args):
-        if "/api/jobs" in (args[0] if args else ""):
+        if args and isinstance(args[0], str) and "/api/jobs" in args[0]:
             return  # skip polling noise
         sys.stderr.write(f"[{self.log_date_time_string()}] {self.address_string()} {fmt % args}\n")
 
@@ -844,7 +851,14 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Ollama: NOT reachable at {OLLAMA_URL} ({getattr(e, 'reason', e)}). "
               "Starting anyway; you can set a different URL in the page.")
-    server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
+    class Server(ThreadingHTTPServer):
+        def handle_error(self, request, client_address):
+            # Clients (and internet scanners) hanging up mid-request is normal; don't dump a traceback.
+            if isinstance(sys.exc_info()[1], (ConnectionError, TimeoutError)):
+                return
+            super().handle_error(request, client_address)
+
+    server = Server(("0.0.0.0", PORT), Handler)
     server.daemon_threads = True             # don't wait on open connections at exit
 
     def _stop(signum, frame):
